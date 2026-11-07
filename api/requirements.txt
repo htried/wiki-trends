@@ -1,0 +1,4 @@
+flask>=3,<4
+requests>=2.31
+sqlalchemy>=2,<3
+pymysql>=1.1
