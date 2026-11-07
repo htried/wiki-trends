@@ -28,7 +28,7 @@ td.spark{width:150px}
 tr.unusual td{background:color-mix(in srgb,var(--hot) 7%,transparent)}
 .rank{color:var(--mute);width:2.5em}
 .title{font-weight:600;overflow-wrap:break-word}
-table td:first-child{min-width:170px}
+table.assoc td:first-child{min-width:170px}
 .kpis{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px}
 .kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.kpi span{font-size:12px;color:var(--mute)}
 .chartbox{position:relative}
