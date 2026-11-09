@@ -16,7 +16,10 @@ api/        Flask API + hourly ingest (Python 3.11)
   wiki_trends/ingest.py   hourly job: top-1000 trending list + the full batch of every article, per project
   wiki_trends/store.py    SQLAlchemy Core: SQLite locally, ToolsDB (MariaDB) on Toolforge
   wiki_trends/app.py      the API (/v1/...)
-  wiki_trends/demo.py     synthetic data for local frontend work
+  wiki_trends/demo.py     synthetic data for local frontend work and previews (WIKI_TRENDS_DEMO=1)
+  wiki_trends/gate.py     optional shared passphrase for the whole site (WIKI_TRENDS_PASSPHRASE)
+  wiki_trends/deploy.py   self-update on pushes to main (GitHub webhook at /hooks/github, or a scheduled job)
+deploy/     Toolforge helpers: uwsgi.ini (reload on touch), autodeploy.sh, demo-refresh.sh
 frontend/   static site (no build step); talks only to the API
   assets/vendor/codex/    Codex, the Wikimedia design system (CSS-only components + design tokens), vendored
 ```
@@ -71,6 +74,50 @@ toolforge jobs run ingest --image python3.11 --schedule '20 * * * *' \
   --command 'cd ~/wiki-trends/api && ~/www/python/venv/bin/python -m wiki_trends.ingest'
 webservice python3.11 start
 ```
+
+### Preview with synthetic data, behind a passphrase
+
+For a preview, skip the WME and `DATABASE_URL` envvars and the `ingest` job above. Until the real data is connected, the
+tool can serve the demo data (English Wikipedia, last 72 hours, a banner on every
+page says it is synthetic) from SQLite in the tool's home, behind a simple shared passphrase:
+
+```bash
+toolforge envvars create WIKI_TRENDS_DEMO 1
+toolforge envvars create WIKI_TRENDS_PROJECTS enwiki
+toolforge envvars create DATABASE_URL sqlite:////data/project/wiki-trends/demo.sqlite3
+toolforge envvars create WIKI_TRENDS_PASSPHRASE '…'      # visitors enter it once (30-day cookie); delete the envvar to open the site
+~/wiki-trends/deploy/demo-refresh.sh                     # first load
+toolforge jobs run demo-refresh --image python3.11 --schedule '15 4 * * *' --command '~/wiki-trends/deploy/demo-refresh.sh'
+webservice python3.11 restart
+```
+
+To switch to real data: `toolforge envvars delete WIKI_TRENDS_DEMO`,
+`toolforge jobs delete demo-refresh`, set `DATABASE_URL` to ToolsDB and `WIKI_TRENDS_PROJECTS` (or delete it for all
+seven), create the `ingest` job, restart. Bots can send the passphrase in an `X-Wiki-Trends-Passphrase` header.
+
+### Updating automatically when main changes
+
+On a push to main, GitHub calls `/hooks/github`; the app checks the signature, pulls (`git pull --ff-only`), reinstalls
+requirements if they changed, and touches a file that makes uWSGI reload the app. Log: `~/deploy.log`.
+
+```bash
+cp ~/wiki-trends/deploy/uwsgi.ini ~/www/python/uwsgi.ini
+toolforge envvars create WIKI_TRENDS_RELOAD_FILE /data/project/wiki-trends/www/python/reload
+toolforge envvars create WIKI_TRENDS_DEPLOY_LOG /data/project/wiki-trends/deploy.log
+toolforge envvars create WIKI_TRENDS_WEBHOOK_SECRET "$(openssl rand -hex 20)"
+toolforge envvars show WIKI_TRENDS_WEBHOOK_SECRET        # copy it into GitHub
+webservice python3.11 restart
+```
+
+Then on GitHub: Settings → Webhooks → Add webhook, payload URL `https://wiki-trends.toolforge.org/hooks/github`,
+content type `application/json`, the secret, "Just the push event". GitHub's ping should get a green check.
+
+The web container needs `git` for this (`webservice python3.11 shell -- git --version`). If it has none, or as a
+fallback, poll instead: `toolforge jobs run autodeploy --image python3.11 --schedule '*/10 * * * *' --command
+'~/wiki-trends/deploy/autodeploy.sh'` (pulls only when main has new commits). Either way, changes reach the site only
+through main of this repository.
+
+### Real data
 
 Create the database once (`sql tools`, then `CREATE DATABASE <user>__wikitrends;`); tables are created on first start.
 Storage: each project's full hourly batch is tens of thousands of rows (English: ~38,000), so seven projects at the

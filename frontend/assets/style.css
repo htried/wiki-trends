@@ -47,3 +47,4 @@ footer{max-width:1200px;margin:0 auto;padding:var(--spacing-100);color:var(--col
 .controls .cdx-select{min-width:0;width:auto}
 .controls .cdx-text-input{width:auto;min-width:0}
 .controls .cdx-field__control{display:flex}
+.demo{margin:0 0 var(--spacing-100)}

@@ -6,16 +6,17 @@ from __future__ import annotations
 import requests
 
 from . import store
-from .config import user_agent, wiki_host
+from .config import is_demo, user_agent, wiki_host
 from .records import key
 
 MAX_AGE = 86400
 
 
 def outlinks(project: str, title: str, session: requests.Session | None = None, max_links: int = 2000) -> list[str]:
-    cached = store.cached_links(project, title, MAX_AGE)
-    if cached is not None:
-        return cached
+    # demo data: only the demo's own link lists, never live ones (real links would mix real pages into fake data)
+    cached = store.cached_links(project, title, 10**10 if is_demo() else MAX_AGE)
+    if cached is not None or is_demo():
+        return cached or []
     s = session or requests.Session()
     params = {"action": "query", "format": "json", "formatversion": 2, "titles": title.replace("_", " "), "redirects": 1,
               "generator": "links", "gplnamespace": 0, "gpllimit": "max"}

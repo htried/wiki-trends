@@ -9,6 +9,11 @@ DATABASE_URL                  SQLAlchemy URL; default sqlite:///wiki_trends.sqli
 WIKI_TRENDS_PROJECTS          comma-separated project identifiers; default the initial WME release
 WIKI_TRENDS_RETENTION_HOURS   hourly history kept per page (default 168 = 7 days)
 WIKI_TRENDS_CONTACT           contact URL or address for the User-Agent sent to Wikimedia APIs
+WIKI_TRENDS_DEMO              1: the data is synthetic (wiki_trends.demo); the site says so on every page
+WIKI_TRENDS_PASSPHRASE        optional shared passphrase for the whole site (wiki_trends/gate.py)
+WIKI_TRENDS_SECRET            optional key for signing the passphrase cookie
+WIKI_TRENDS_WEBHOOK_SECRET    GitHub webhook secret for self-update on pushes to main (wiki_trends/deploy.py)
+WIKI_TRENDS_RELOAD_FILE       file uWSGI watches for reloads (deploy/uwsgi.ini)
 """
 
 from __future__ import annotations
@@ -47,3 +52,7 @@ def retention_hours() -> int:
 def user_agent() -> str:
     contact = os.environ.get("WIKI_TRENDS_CONTACT", "https://toolsadmin.wikimedia.org/")
     return f"wiki-trends/0.1 ({contact})"
+
+
+def is_demo() -> bool:
+    return os.environ.get("WIKI_TRENDS_DEMO", "").strip().lower() in ("1", "true", "yes")

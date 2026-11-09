@@ -19,6 +19,7 @@ async function api(path) {
   const r = await fetch(API() + path);
   let body = null;
   try { body = await r.json() } catch (e) { /* not JSON */ }
+  if (r.status === 401 && !API()) { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search); return new Promise(() => {}) }
   if (!r.ok) throw new Error((body && body.error) || `HTTP ${r.status}`);
   return body;
 }
@@ -28,6 +29,17 @@ function setParams(p) {
   const q = new URLSearchParams(Object.entries(p).filter(([, v]) => v != null && v !== ""));
   history.replaceState(null, "", "?" + q.toString());
 }
+// a banner on every page when the API serves synthetic data
+api("/v1/projects").then(d => {
+  if (!d || !d.demo) return;
+  const m = document.createElement("div");
+  m.className = "cdx-message cdx-message--warning demo"; m.setAttribute("role", "status");
+  m.innerHTML = `<span class="cdx-message__icon"></span><div class="cdx-message__content"><strong>Demo:</strong> these pageviews are synthetic, made up around one story (a film of <em>The Odyssey</em> with Matt Damon) so the site can be tried out before live Wikimedia Enterprise data is connected. Only English Wikipedia, last 72 hours.</div>`;
+  document.querySelector("main").prepend(m);
+  const sel = document.getElementById("project"), have = new Set(d.projects.map(p => p.project));
+  if (sel) [...sel.options].forEach(o => { if (!have.has(o.value)) o.remove() });
+}).catch(() => {});
+
 function projectOptions(sel, current) {
   sel.innerHTML = Object.entries(PROJECTS).map(([k, v]) => `<option value="${k}" ${k === current ? "selected" : ""}>${v} Wikipedia</option>`).join("");
 }

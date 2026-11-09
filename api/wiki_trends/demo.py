@@ -1,13 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Synthetic data for working on the frontend without WME credentials: three days of hourly records for English
 Wikipedia, built around one story (a film adaptation of The Odyssey: "The Odyssey" moving with "Matt Damon"), plus
-ordinary pages, clickstream sources, geography, and cached article links. Never use for anything but local development.
+ordinary pages, clickstream sources, geography, and cached article links. For local development and previews only;
+run the site with WIKI_TRENDS_DEMO=1 so it says the data is synthetic and never mixes in live data.
 
-    DATABASE_URL=sqlite:///demo.sqlite3 python -m wiki_trends.demo
+    DATABASE_URL=sqlite:///demo.sqlite3 WIKI_TRENDS_PROJECTS=enwiki python -m wiki_trends.demo [--reset]
+
+The 72 hours end two hours ago, so rerun it (e.g. daily, with --reset) to keep the demo current.
 """
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 import math
 import random
 import time
@@ -37,11 +42,15 @@ GEO = {"default": [("US", 0.42), ("GB", 0.12), ("IN", 0.10), ("CA", 0.06), ("AU"
        "Homer": [("US", 0.3), ("GR", 0.2), ("GB", 0.15), ("IN", 0.1)], "Matt_Damon": [("US", 0.55), ("GB", 0.1), ("CA", 0.08)]}
 
 
+def _id(title: str, mod: int) -> int:  # stable across runs, unlike hash()
+    return int(hashlib.md5(title.encode()).hexdigest()[:12], 16) % mod
+
+
 def record(title: str, hour: int, count: int, mean: float, std: float, trending: bool) -> dict:
     t = datetime.fromtimestamp(hour * 3600, timezone.utc)
     z = (count - mean) / std if std else 0.0
-    return {"name": title, "identifier": abs(hash(title)) % 10**7, "url": f"https://en.wikipedia.org/wiki/{title}",
-            "main_entity": {"identifier": f"Q{abs(hash(title)) % 10**6}"},
+    return {"name": title, "identifier": _id(title, 10**7), "url": f"https://en.wikipedia.org/wiki/{title}",
+            "main_entity": {"identifier": f"Q{_id(title, 10**6)}"},
             "views": [{"comment": "views during the hour",
                        "period": {"start": t.strftime("%Y-%m-%dT%H:00:00Z"), "end": t.strftime("%Y-%m-%dT%H:59:59Z")},
                        "count": count, "project_proportion": count / 9_000_000,
@@ -55,8 +64,14 @@ def record(title: str, hour: int, count: int, mean: float, std: float, trending:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--reset", action="store_true", help="delete everything in the database first")
+    args = ap.parse_args()
     rng = random.Random(3)
-    store.engine()
+    eng = store.engine()
+    if args.reset:
+        store.md.drop_all(eng)
+        store.md.create_all(eng)
     now = int(time.time()) // 3600 - 2
     hours = list(range(now - 71, now + 1))
     story_hour = now - 8

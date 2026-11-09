@@ -22,14 +22,17 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 
+from . import deploy, gate
 from . import links as linkmod
 from . import store
-from .config import projects, retention_hours, wiki_host
+from .config import is_demo, projects, retention_hours, wiki_host
 from .records import flatten, key
 from .wme import NotAvailable, WMEClient, WMEError
 
 app = Flask(__name__)
 app.json.sort_keys = False
+gate.install(app)
+deploy.install(app)
 _client: WMEClient | None = None
 _fetch_lock = threading.Lock()
 
@@ -118,7 +121,7 @@ def list_projects():
         out.append({"project": p, "host": wiki_host(p),
                     "trending_hours": {"first": iso_hour(th[0]), "last": iso_hour(th[-1]), "count": len(th)} if th else None,
                     "batch_hours": {"first": iso_hour(bh[0]), "last": iso_hour(bh[-1]), "count": len(bh)} if bh else None})
-    return jsonify({"projects": out, "retention_hours": retention_hours()})
+    return jsonify({"projects": out, "retention_hours": retention_hours(), "demo": is_demo()})
 
 
 @app.get("/v1/trending/<project>")
@@ -149,6 +152,8 @@ def _fetch_trending(project: str, hour: int) -> None:
     with _fetch_lock:
         if store.is_loaded(project, hour, "trending"):
             return
+        if is_demo():
+            raise ApiError(404, f"no demo data for {project} at {iso_hour(hour)}; the demo covers the last 72 hours")
         try:
             recs = [flatten(r, hour) for r in client().trending(project, hour, 1000)]
         except NotAvailable:
