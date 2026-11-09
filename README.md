@@ -86,7 +86,7 @@ toolforge envvars create WIKI_TRENDS_DEMO 1
 toolforge envvars create WIKI_TRENDS_PROJECTS enwiki
 toolforge envvars create DATABASE_URL sqlite:////data/project/wiki-trends/demo.sqlite3
 toolforge envvars create WIKI_TRENDS_PASSPHRASE '…'      # visitors enter it once (30-day cookie); delete the envvar to open the site
-~/wiki-trends/deploy/demo-refresh.sh                     # first load
+webservice python3.11 shell -- ~/wiki-trends/deploy/demo-refresh.sh   # first load; the venv only works inside the python3.11 image, not on the bastion
 toolforge jobs run demo-refresh --image python3.11 --schedule '15 4 * * *' --command '~/wiki-trends/deploy/demo-refresh.sh'
 webservice python3.11 restart
 ```
