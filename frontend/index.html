@@ -1,22 +1,28 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wikipedia Trends</title>
+<link rel="stylesheet" href="assets/vendor/codex/codex-tokens.css">
+<link rel="stylesheet" href="assets/vendor/codex/codex.style.css">
 <link rel="stylesheet" href="assets/style.css">
 </head><body>
 <header><div class="bar"><a class="brand" href="./">Wikipedia trends</a>
- <nav><a class="on" href="./">Trending</a><a href="page.html">Page explorer</a></nav></div></header>
+ <nav class="nav"><a class="on" href="./">Trending</a><a href="page.html">Page explorer</a></nav></div></header>
 <main>
  <div class="controls">
-  <label>Wikipedia <select id="project"></select></label>
-  <label>Date (UTC) <input type="date" id="date"></label>
-  <label>Hour (UTC) <select id="hour"></select></label>
-  <label>Show <select id="k"><option>10</option><option>25</option><option selected>50</option><option>100</option></select></label>
-  <button id="latest">Latest hour</button>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="project"><span class="cdx-label__label__text">Wikipedia</span></label></div>
+   <div class="cdx-field__control"><select id="project" class="cdx-select"></select></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="date"><span class="cdx-label__label__text">Date (UTC)</span></label></div>
+   <div class="cdx-field__control"><div class="cdx-text-input"><input type="date" id="date" class="cdx-text-input__input"></div></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="hour"><span class="cdx-label__label__text">Hour (UTC)</span></label></div>
+   <div class="cdx-field__control"><select id="hour" class="cdx-select"></select></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="k"><span class="cdx-label__label__text">Show</span></label></div>
+   <div class="cdx-field__control"><select id="k" class="cdx-select"><option>10</option><option>25</option><option selected>50</option><option>100</option></select></div></div>
+  <button id="latest" class="cdx-button">Latest hour</button>
  </div>
- <p class="status" id="status">Loading…</p>
- <div class="card" style="padding:4px 14px"><table>
+ <div id="status" class="status">Loading…</div>
+ <div class="cdx-table"><div class="cdx-table__table-wrapper"><table class="cdx-table__table">
   <thead><tr><th class="rank">#</th><th>Page</th><th class="n">Views this hour</th><th class="n" title="views this hour over the page's average of the previous 96 hours">vs usual</th><th class="n" title="standard deviations above the previous 96 hours' average">z-score</th><th>Signals</th><th class="spark">Last 72 hours</th></tr></thead>
-  <tbody id="rows"></tbody></table></div>
+  <tbody id="rows"></tbody></table></div></div>
 </main>
 <footer>Pageview data: Wikimedia Enterprise pageviews API (beta), hourly, articles only. A page is trending when its views this hour are far above its own recent history; pages are ranked by Wikimedia Enterprise. Times are UTC.</footer>
 <script src="assets/config.js"></script>
@@ -29,22 +35,22 @@ $("hour").innerHTML = [...Array(24).keys()].map(h => `<option value="${String(h)
 $("k").value = String(st.k);
 
 async function load() {
-  $("status").textContent = "Loading…"; $("status").classList.remove("err");
+  showStatus($("status"), "Loading…");
   const q = new URLSearchParams({k: st.k, spark: 72}); if (st.hour) q.set("hour", st.hour);
   setParams({project: st.project, hour: st.hour, k: st.k});
   let d;
   try { d = await api(`/v1/trending/${st.project}?${q}`) }
-  catch (e) { $("status").textContent = e.message; $("status").classList.add("err"); $("rows").innerHTML = ""; return }
+  catch (e) { showStatus($("status"), e.message, true); $("rows").innerHTML = ""; return }
   const ms = hourMs(d.hour);
   $("date").value = new Date(ms).toISOString().slice(0, 10); $("hour").value = new Date(ms).toISOString().slice(11, 13);
   const hh = String(new Date(ms).getUTCHours()).padStart(2, "0"), day = hourLabel(ms).split(",")[0];
-  $("status").textContent = `${d.items.length} trending pages on ${PROJECTS[st.project]} Wikipedia, ${day}, ${hh}:00–${hh}:59 UTC`;
+  showStatus($("status"), `${d.items.length} trending pages on ${PROJECTS[st.project]} Wikipedia, ${day}, ${hh}:00–${hh}:59 UTC`);
   $("rows").innerHTML = d.items.map((it, i) => `<tr>
     <td class="rank">${it.rank}</td>
     <td><a class="title" href="page.html?project=${st.project}&title=${encodeURIComponent(it.title)}&hour=${hourParam(ms)}">${esc(nice(it.title))}</a>
       <a href="${esc(it.url)}" target="_blank" rel="noopener" title="open on Wikipedia">↗</a></td>
     <td class="n">${fmt(it.views)}</td><td class="n">${fmtX(it.ratio)}</td><td class="n">${it.zscore == null ? "–" : it.zscore.toFixed(1)}</td>
-    <td>${it.signals.absolute ? '<span class="badge hot" title="views far above its recent history">views</span>' : ""}${it.signals.relative ? '<span class="badge acc" title="share of all views far above its recent history">share</span>' : ""}${it.signals.new_page ? '<span class="badge">new page</span>' : ""}</td>
+    <td><span class="chips">${it.signals.absolute ? chip("views", "warning", "views far above its recent history") : ""}${it.signals.relative ? chip("share", "progressive", "share of all views far above its recent history") : ""}${it.signals.new_page ? chip("new page") : ""}</span></td>
     <td class="spark"><canvas data-i="${i}"></canvas></td></tr>`).join("");
   document.querySelectorAll("canvas[data-i]").forEach(cv => sparkline(cv, d.items[+cv.dataset.i].spark || []));
 }

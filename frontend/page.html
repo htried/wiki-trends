@@ -1,19 +1,26 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Page Explorer · Wikipedia Trends</title>
+<link rel="stylesheet" href="assets/vendor/codex/codex-tokens.css">
+<link rel="stylesheet" href="assets/vendor/codex/codex.style.css">
 <link rel="stylesheet" href="assets/style.css">
 </head><body>
 <header><div class="bar"><a class="brand" href="./">Wikipedia trends</a>
- <nav><a href="./">Trending</a><a class="on" href="page.html">Page explorer</a></nav></div></header>
+ <nav class="nav"><a href="./">Trending</a><a class="on" href="page.html">Page explorer</a></nav></div></header>
 <main>
  <div class="controls">
-  <label>Wikipedia <select id="project"></select></label>
-  <label>Page <span class="search"><input id="title" placeholder="Search a page…" autocomplete="off"><span class="sugg" id="sugg"></span></span></label>
-  <label title="how many associated pages make up the entity">Associated pages <select id="k"><option>10</option><option>50</option><option>100</option></select></label>
-  <label>Window <select id="hours"><option value="24">24 hours</option><option value="72" selected>72 hours</option><option value="168">7 days</option></select></label>
-  <label>Hour (UTC) <input id="hour" placeholder="latest" style="width:150px"></label>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="project"><span class="cdx-label__label__text">Wikipedia</span></label></div>
+   <div class="cdx-field__control"><select id="project" class="cdx-select"></select></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="title"><span class="cdx-label__label__text">Page</span></label></div>
+   <div class="cdx-field__control"><div class="search"><div class="cdx-text-input"><input id="title" class="cdx-text-input__input" placeholder="Search a page…" autocomplete="off"></div><div class="sugg" id="sugg"></div></div></div></div>
+  <div class="cdx-field" title="how many associated pages make up the entity"><div class="cdx-label"><label class="cdx-label__label" for="k"><span class="cdx-label__label__text">Associated pages</span></label></div>
+   <div class="cdx-field__control"><select id="k" class="cdx-select"><option>10</option><option>50</option><option>100</option></select></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="hours"><span class="cdx-label__label__text">Window</span></label></div>
+   <div class="cdx-field__control"><select id="hours" class="cdx-select"><option value="24">24 hours</option><option value="72" selected>72 hours</option><option value="168">7 days</option></select></div></div>
+  <div class="cdx-field"><div class="cdx-label"><label class="cdx-label__label" for="hour"><span class="cdx-label__label__text">Hour (UTC)</span></label></div>
+   <div class="cdx-field__control"><div class="cdx-text-input"><input id="hour" class="cdx-text-input__input" placeholder="latest, or 2026-11-16T15" style="width:190px"></div></div></div>
  </div>
- <p class="status" id="status"></p>
+ <div id="status" class="status"></div>
  <div id="view"></div>
 </main>
 <footer>Associated pages: the page's own article links and the pages that send it readers (Wikipedia clickstream, monthly), ranked by their views this hour. "vs usual" compares a page's views this hour with its average over the previous 96 hours. The clickstream column compares each source page's share of the group's views now with its share of the page's incoming clicks last month. Geography is daily. Data: Wikimedia Enterprise pageviews API (beta).</footer>
@@ -29,65 +36,66 @@ let world = null;
 
 async function load() {
   setParams({project: st.project, title: st.title, k: st.k, hours: st.hours, hour: st.hour});
-  if (!st.title) { $("status").textContent = "Pick a page to see how it and its associated pages are moving."; $("view").innerHTML = ""; return }
-  $("status").textContent = "Loading…"; $("status").classList.remove("err");
+  if (!st.title) { showStatus($("status"), "Pick a page to see how it and its associated pages are moving."); $("view").innerHTML = ""; return }
+  showStatus($("status"), "Loading…");
   const q = new URLSearchParams({k: st.k, hours: st.hours}); if (st.hour) q.set("hour", st.hour);
   let d;
   try { d = await api(`/v1/pages/${st.project}/${encodeURIComponent(st.title)}?${q}`) }
-  catch (e) { $("status").textContent = e.message; $("status").classList.add("err"); $("view").innerHTML = ""; return }
+  catch (e) { showStatus($("status"), e.message, true); $("view").innerHTML = ""; return }
   render(d);
 }
 
 function render(d) {
   const ms = hourMs(d.hour), start = ms - (d.hours - 1) * 3600e3, p = d.page, en = d.entity;
   document.title = `${nice(p.title)} · Wikipedia Trends`;
-  $("status").textContent = hourLabel(ms);
-  const sig = p.signals ? (p.signals.absolute ? '<span class="badge hot">trending: views</span>' : "") + (p.signals.relative ? '<span class="badge acc">trending: share</span>' : "") : "";
+  showStatus($("status"), hourLabel(ms));
+  const sig = p.signals ? (p.signals.absolute ? chip("trending: views", "warning") : "") + (p.signals.relative ? chip("trending: share", "progressive") : "") : "";
   $("view").innerHTML = `
-   <div class="card"><h1><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(nice(p.title))}</a> ${sig}</h1>
+   <div class="panel"><h1><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(nice(p.title))}</a></h1><div class="chips">${sig}</div>
     <div class="kpis">
      <div class="kpi"><b>${fmt(p.views)}</b><span>views this hour${p.views == null ? " (below the data's threshold)" : ""}</span></div>
      <div class="kpi"><b>${fmtX(p.ratio)}</b><span>vs its usual</span></div>
      <div class="kpi"><b>${fmt(en.views)}</b><span>views of its top ${en.members.length} associated pages</span></div>
      <div class="kpi"><b>${fmtX(en.ratio)}</b><span>associated pages vs their usual</span></div>
     </div></div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+   <div class="panel"><div class="head-row">
      <h2>Page and its associated pages, hourly</h2>
-     <span class="toggle sub">y axis: <button data-log="1" class="${st.log ? "on" : ""}">log</button> <button data-log="0" class="${st.log ? "" : "on"}">linear</button></span></div>
+     ${toggles("log", [["1", "Log scale"], ["0", "Linear"]], st.log ? "1" : "0")}</div>
     <div class="chartbox"><canvas id="main"></canvas><div class="tip" id="tip"></div></div>
-    <div class="legend"><span><i style="background:${css("--ink")}"></i>${esc(nice(p.title))}</span><span><i style="background:${css("--acc")}"></i>top ${en.members.length} associated pages, summed</span></div></div>
-   <div class="card"><h2>Associated pages</h2>
-    <div class="sub" style="margin-bottom:6px">${en.with_views} of ${en.candidates} linked or referring pages had views this hour; the top ${en.members.length} by views. Highlighted: far above their own recent history.</div>
-    <div style="overflow-x:auto"><table class="assoc"><thead><tr><th>Page</th><th class="n">Views</th><th class="n">vs usual</th><th class="n" title="share of the page's incoming clicks last month (clickstream)">Clicks in, last month</th><th class="n" title="share of this hour's views among the page's source pages">Share now</th><th class="n" title="share now over share last month">Change</th><th>How associated</th><th class="spark">${d.hours} hours</th></tr></thead>
+    <div class="legend"><span><i style="background:${css("--color-base")}"></i>${esc(nice(p.title))}</span><span><i style="background:${css("--color-progressive")}"></i>top ${en.members.length} associated pages, summed</span></div></div>
+   <div class="panel"><h2>Associated pages</h2>
+    <div class="subtle" style="margin-bottom:8px">${en.with_views} of ${en.candidates} linked or referring pages had views this hour; the top ${en.members.length} by views. Highlighted: far above their own recent history.</div>
+    <div class="cdx-table" style="margin:0"><div class="cdx-table__table-wrapper"><table class="cdx-table__table assoc"><thead><tr><th>Page</th><th class="n">Views</th><th class="n">vs usual</th><th class="n" title="share of the page's incoming clicks last month (clickstream)">Clicks in, last month</th><th class="n" title="share of this hour's views among the page's source pages">Share now</th><th class="n" title="share now over share last month">Change</th><th>How associated</th><th class="spark">${d.hours} hours</th></tr></thead>
     <tbody>${en.members.map((m, i) => `<tr class="${m.unusual ? "unusual" : ""}">
       <td><a class="title" href="page.html?project=${d.project}&title=${encodeURIComponent(m.title)}&k=${st.k}&hours=${st.hours}${st.hour ? "&hour=" + st.hour : ""}">${esc(nice(m.title))}</a> <a href="${esc(m.url)}" target="_blank" rel="noopener">↗</a></td>
       <td class="n">${fmt(m.views)}</td><td class="n">${fmtX(m.ratio)}</td>
       <td class="n">${pct(m.clickstream_share)}</td><td class="n">${pct(m.current_source_share)}</td>
-      <td class="n">${m.clickstream_deviation == null ? "–" : `<b style="color:${m.clickstream_deviation >= 3 ? css("--hot") : "inherit"}">${fmtX(m.clickstream_deviation)}</b>`}</td>
-      <td>${m.linked ? '<span class="badge">linked</span>' : ""}${m.clickstream_share != null ? '<span class="badge">sends readers</span>' : ""}${m.trending ? '<span class="badge hot">trending</span>' : ""}</td>
-      <td class="spark"><canvas data-i="${i}"></canvas></td></tr>`).join("")}</tbody></table></div></div>
-   <div class="card"><h2>Where readers are</h2><div class="sub" style="margin-bottom:8px">Share of views by country, daily${d.geo.period && d.geo.period.start ? ` (${esc(d.geo.period.start.slice(0, 10))})` : ""}</div>
-    <div class="maps"><div class="map"><div class="sub">${esc(nice(p.title))}</div><div id="mapP"></div></div>
-     <div class="map"><div class="sub">Its top associated pages, weighted by views</div><div id="mapA"></div></div></div></div>`;
+      <td class="n">${m.clickstream_deviation == null ? "–" : `<b style="color:${m.clickstream_deviation >= 3 ? css("--color-destructive") : "inherit"}">${fmtX(m.clickstream_deviation)}</b>`}</td>
+      <td><span class="chips">${m.linked ? chip("linked") : ""}${m.clickstream_share != null ? chip("sends readers") : ""}${m.trending ? chip("trending", "warning") : ""}</span></td>
+      <td class="spark"><canvas data-i="${i}"></canvas></td></tr>`).join("")}</tbody></table></div></div></div>
+   <div class="panel"><h2>Where readers are</h2><div class="subtle" style="margin-bottom:8px">Share of views by country, daily${d.geo.period && d.geo.period.start ? ` (${esc(d.geo.period.start.slice(0, 10))})` : ""}</div>
+    <div class="maps"><div class="map"><div class="subtle">${esc(nice(p.title))}</div><div id="mapP"></div></div>
+     <div class="map"><div class="subtle">Its top associated pages, weighted by views</div><div id="mapA"></div></div></div></div>`;
   axisChart($("main"), $("tip"), {startMs: start, log: st.log, lines: [
-    {name: nice(p.title), values: p.spark, color: css("--ink"), width: 2},
-    {name: `top ${en.members.length} associated`, values: en.spark, color: css("--acc"), width: 2}]});
+    {name: nice(p.title), values: p.spark, color: css("--color-base"), width: 2},
+    {name: `top ${en.members.length} associated`, values: en.spark, color: css("--color-progressive"), width: 2}]});
   document.querySelectorAll("canvas[data-i]").forEach(cv => sparkline(cv, en.members[+cv.dataset.i].spark));
   document.querySelectorAll("[data-log]").forEach(b => b.onclick = () => { st.log = b.dataset.log === "1"; render(d) });
   drawMap($("mapP"), d.geo.page); drawMap($("mapA"), d.geo.associated);
 }
 
 async function drawMap(el, shares) {
-  if (!shares || !shares.length) { el.innerHTML = '<div class="sub" style="padding:20px 0">No geographic data for this page.</div>'; return }
-  if (typeof d3 === "undefined") { el.innerHTML = '<div class="sub">Map library unavailable.</div>'; return }
+  if (!shares || !shares.length) { el.innerHTML = '<div class="subtle" style="padding:20px 0">No geographic data for this page.</div>'; return }
+  if (typeof d3 === "undefined") { el.innerHTML = '<div class="subtle">Map library unavailable.</div>'; return }
   world = world || await fetch("assets/countries-110m.geojson").then(r => r.json());
   const by = Object.fromEntries(shares.map(s => [s.country, s.proportion])), max = Math.max(...shares.map(s => s.proportion));
   const w = 480, h = 250, proj = d3.geoEqualEarth().fitSize([w, h], world), path = d3.geoPath(proj);
-  const color = v => d3.interpolateBlues(0.15 + 0.85 * Math.sqrt(v / max));
+  // Codex progressive scale: light progressive background to full progressive blue
+  const ramp = d3.interpolateRgb(css("--background-color-progressive-subtle"), css("--color-progressive")), color = v => ramp(0.2 + 0.8 * Math.sqrt(v / max));
   el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="share of views by country">${world.features.map(f => {
     const v = by[f.properties.iso];
-    return `<path d="${path(f)}" fill="${v ? color(v) : css("--line")}" stroke="${css("--card")}" stroke-width="0.4"><title>${esc(f.properties.name)}: ${v ? pct(v) : "no data"}</title></path>`;
-  }).join("")}</svg><div class="sub">${shares.slice(0, 5).map(s => `${esc(s.country)} ${pct(s.proportion)}`).join(" · ")}</div>`;
+    return `<path d="${path(f)}" fill="${v ? color(v) : css("--border-color-subtle")}" stroke="${css("--background-color-base")}" stroke-width="0.4"><title>${esc(f.properties.name)}: ${v ? pct(v) : "no data"}</title></path>`;
+  }).join("")}</svg><div class="subtle">${shares.slice(0, 5).map(s => `${esc(s.country)} ${pct(s.proportion)}`).join(" · ")}</div>`;
 }
 
 // page search: Wikipedia's own title suggestions for the chosen project

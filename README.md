@@ -18,6 +18,7 @@ api/        Flask API + hourly ingest (Python 3.11)
   wiki_trends/app.py      the API (/v1/...)
   wiki_trends/demo.py     synthetic data for local frontend work
 frontend/   static site (no build step); talks only to the API
+  assets/vendor/codex/    Codex, the Wikimedia design system (CSS-only components + design tokens), vendored
 ```
 
 The frontend and the API are separate: the frontend only calls `/v1`, so it can be hosted anywhere (set the API's URL in
@@ -76,6 +77,13 @@ Storage: each project's full hourly batch is tens of thousands of rows (English:
 default 7-day retention are on the order of 15–20 million rows; lower `WIKI_TRENDS_RETENTION_HOURS` if ToolsDB space is
 tight. Wikimedia Enterprise publishes an hour a few hours after it ends; the job picks up each hour on the first run after
 it appears.
+
+## Design
+
+The frontend uses [Codex](https://doc.wikimedia.org/codex/), the Wikimedia design system, through its CSS-only
+components (fields, selects, text inputs, buttons, toggle buttons, tables, info chips, messages) and its design tokens for
+every color, size and space; dark mode follows the reader's system setting via Codex's dark-mode tokens. Codex is
+vendored in `frontend/assets/vendor/codex` (v2.7.0, GPL-2.0-or-later) rather than loaded from a CDN.
 
 ## Privacy and data
 

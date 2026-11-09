@@ -57,8 +57,8 @@ function sparkline(el, values, color, tries = 0) {
   const lo = Math.min(...vals.filter(v => v != null), 0), hi = Math.max(...vals.filter(v => v != null), 1);
   const xs = values.map((_, i) => pad + (w - 2 * pad) * i / Math.max(1, n - 1));
   const ys = vals.map(v => v == null ? null : 32 - pad - (32 - 2 * pad) * (v - lo) / ((hi - lo) || 1));
-  drawLine(c, xs, ys, color || css("--ink"), 1.4);
-  if (ys[n - 1] != null) { c.fillStyle = css("--hot"); c.fillRect(xs[n - 1] - 2, ys[n - 1] - 2, 4, 4) }
+  drawLine(c, xs, ys, color || css("--color-base"), 1.4);
+  if (ys[n - 1] != null) { c.fillStyle = css("--color-destructive"); c.fillRect(xs[n - 1] - 2, ys[n - 1] - 2, 4, 4) }
 }
 // time-series chart with a shared y axis (log or linear) and an hour tooltip
 const AX = {left: 56, right: 10, top: 8, bottom: 22};
@@ -76,13 +76,13 @@ function axisChart(el, tip, opts, tries = 0) {
   else { const st = 10 ** Math.floor(Math.log10(hi)), step = hi / st > 5 ? 2 * st : hi / st > 2 ? st : st / 2; for (let v = 0; v <= hi; v += step) ticks.push(v) }
   c.font = "11px system-ui"; c.textAlign = "right";
   for (const v of ticks) {
-    const yy = Math.round(Y(v)) + .5; c.fillStyle = css("--line"); c.fillRect(AX.left, yy, pw, 1);
-    c.fillStyle = css("--mute"); c.fillText(v >= 1e6 ? `${v / 1e6}M` : v >= 1e3 ? `${v / 1e3}k` : `${v}`, AX.left - 6, yy + 4);
+    const yy = Math.round(Y(v)) + .5; c.fillStyle = css("--border-color-subtle"); c.fillRect(AX.left, yy, pw, 1);
+    c.fillStyle = css("--color-subtle"); c.fillText(v >= 1e6 ? `${v / 1e6}M` : v >= 1e3 ? `${v / 1e3}k` : `${v}`, AX.left - 6, yy + 4);
   }
   c.textAlign = "center";  // day ticks at 00:00 UTC
   for (let i = 0; i < n; i++) {
     const d = new Date(startMs + i * 3600e3);
-    if (d.getUTCHours() === 0) { c.fillStyle = css("--line"); c.fillRect(X(i), AX.top, 1, ph); c.fillStyle = css("--mute"); c.fillText(`${MON[d.getUTCMonth()]} ${d.getUTCDate()}`, X(i), height - 6) }
+    if (d.getUTCHours() === 0) { c.fillStyle = css("--border-color-subtle"); c.fillRect(X(i), AX.top, 1, ph); c.fillStyle = css("--color-subtle"); c.fillText(`${MON[d.getUTCMonth()]} ${d.getUTCDate()}`, X(i), height - 6) }
   }
   const xs = [...Array(n).keys()].map(X);
   for (const l of lines) drawLine(c, xs, l.values.map(v => v == null ? null : Y(v)), l.color, l.width || 1.8);
@@ -94,3 +94,13 @@ function axisChart(el, tip, opts, tries = 0) {
   };
   el.onmouseleave = () => { tip.style.display = "none" };
 }
+
+// ---- Codex markup helpers (CSS-only components)
+const chip = (text, status, title) => `<span class="cdx-info-chip${status ? " cdx-info-chip--" + status : ""}"${title ? ` title="${esc(title)}"` : ""}><span class="cdx-info-chip__text">${esc(text)}</span></span>`;
+function showStatus(el, text, isError) {
+  if (isError) { el.innerHTML = `<div class="cdx-message cdx-message--error" role="alert"><span class="cdx-message__icon"></span><div class="cdx-message__content">${esc(text)}</div></div>`; el.className = "" }
+  else { el.textContent = text; el.className = "status" }
+}
+// toggle button group: [[value, label], ...]
+const toggles = (name, options, current) => `<div class="cdx-toggle-button-group">${options.map(([v, label]) =>
+  `<button type="button" class="cdx-toggle-button cdx-toggle-button--framed${v === current ? " cdx-toggle-button--toggled-on" : ""}" aria-pressed="${v === current}" data-${name}="${v}">${esc(label)}</button>`).join("")}</div>`;
