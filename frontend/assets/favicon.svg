@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<style>.l{stroke:#36c}.s{fill:#edab00}@media (prefers-color-scheme:dark){.l{stroke:#88a3e8}.s{fill:#ffcc33}}</style>
+<path class="l" d="M2.5 25 q2 -3 4 0 t4 0 t4 0 q1.6 1.8 3.4 -2.4 L24.5 9" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path class="s" transform="translate(25.5 6.8) scale(1.08)" d="M0 -6 L1.76 -2.43 L5.71 -1.85 L2.85 0.93 L3.53 4.85 L0 3 L-3.53 4.85 L-2.85 0.93 L-5.71 -1.85 L-1.76 -2.43 Z"/>
+</svg>

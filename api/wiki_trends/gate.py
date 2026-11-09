@@ -20,7 +20,7 @@ from flask import Flask, jsonify, make_response, redirect, request
 COOKIE = "wiki_trends_pass"
 MAX_AGE = 30 * 86400
 # reachable without the passphrase: the login page and what it needs, health checks, the deploy webhook
-OPEN = ("/login", "/v1/health", "/hooks/github", "/assets/style.css", "/assets/vendor/codex/")
+OPEN = ("/login", "/v1/health", "/hooks/github", "/assets/style.css", "/assets/favicon.svg", "/assets/vendor/codex/")
 
 
 def passphrase() -> str | None:
@@ -43,6 +43,7 @@ def _ok(p: str) -> bool:
 LOGIN_PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wikipedia Trends</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="stylesheet" href="/assets/vendor/codex/codex-tokens.css">
 <link rel="stylesheet" href="/assets/vendor/codex/codex.style.css">
 <link rel="stylesheet" href="/assets/style.css">
