@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Layout on top of Codex (vendor/codex): components come from codex.style.css, every color, size and space from the
    Codex design tokens, so light and dark mode follow the Wikimedia UI theme. */
 :root{color-scheme:light dark}

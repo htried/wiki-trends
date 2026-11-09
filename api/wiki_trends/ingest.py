@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Hourly ingest from Wikimedia Enterprise: the top-1000 trending list and the full batch of every article, per project.
 
     python -m wiki_trends.ingest                       # the last 12 hours not yet loaded (run hourly)

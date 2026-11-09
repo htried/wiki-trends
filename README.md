@@ -90,3 +90,12 @@ vendored in `frontend/assets/vendor/codex` (v2.7.0, GPL-2.0-or-later) rather tha
 The frontend loads scripts only from this tool and Toolforge's CDN mirror (`tools-static.wmflabs.org`), and calls the
 Wikipedia API only for title suggestions. The world map is Natural Earth (public domain). Pageview data comes from the
 Wikimedia Enterprise pageviews API; check its terms before making the site public.
+
+## License
+
+Copyright (C) 2026 wiki-trends contributors. GPL-2.0-or-later: you can redistribute and/or modify this program under the
+terms of the GNU General Public License as published by the Free Software Foundation, either version 2 of the License,
+or (at your option) any later version. See [LICENSE](LICENSE).
+
+Bundled third-party files keep their own licenses: Codex (`frontend/assets/vendor/codex`, GPL-2.0-or-later) and the
+Natural Earth country outlines (`frontend/assets/countries-110m.geojson`, public domain).

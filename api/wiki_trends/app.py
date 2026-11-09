@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The wiki-trends API (Flask, WSGI: Toolforge's python webservice serves `app`).
 
 GET /v1/projects

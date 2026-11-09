@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Synthetic data for working on the frontend without WME credentials: three days of hourly records for English
 Wikipedia, built around one story (a film adaptation of The Odyssey: "The Odyssey" moving with "Matt Damon"), plus
 ordinary pages, clickstream sources, geography, and cached article links. Never use for anything but local development.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """A page's outgoing article links, from the public MediaWiki Action API, redirects resolved, cached for a day."""
 
 from __future__ import annotations

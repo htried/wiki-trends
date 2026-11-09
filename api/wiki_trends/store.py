@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Storage (SQLAlchemy Core): SQLite locally, ToolsDB (MariaDB) on Toolforge.
 
 hourly      one row per (project, hour, page): count, share of project views, 96-hour statistics, trending signals

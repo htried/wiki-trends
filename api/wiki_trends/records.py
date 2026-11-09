@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Flatten Wikimedia Enterprise Pageviews records (the `pageviews` schema) into what the site stores and serves."""
 
 from __future__ import annotations

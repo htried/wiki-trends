@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 // Shared helpers: API calls, formatting, URL state, charts.
 const API = () => (window.WIKI_TRENDS_API || "").replace(/\/$/, "");
 const PROJECTS = {enwiki: "English", dewiki: "German", eswiki: "Spanish", frwiki: "French", itwiki: "Italian", nlwiki: "Dutch", ptwiki: "Portuguese"};

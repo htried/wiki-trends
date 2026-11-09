@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Settings, all from the environment (Toolforge: `toolforge envvars create NAME VALUE`; locally: a .env file you export).
 
 WME_USERNAME / WME_PASSWORD   Wikimedia Enterprise account; the client logs in and refreshes its own access token
