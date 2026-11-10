@@ -98,7 +98,7 @@ def main() -> None:
         store.write_trending("enwiki", h, trend)
     for t, ls in LINKS.items():
         store.store_links("enwiki", t, ls)
-    print(f"demo data: enwiki, {len(hours)} hours ending {datetime.fromtimestamp(now * 3600, timezone.utc):%Y-%m-%d %H}:00 UTC; "
+    print(f"demo data in {eng.url.render_as_string(hide_password=True)}: enwiki, {len(hours)} hours ending {datetime.fromtimestamp(now * 3600, timezone.utc):%Y-%m-%d %H}:00 UTC; "
           f"story breaks at {datetime.fromtimestamp(story_hour * 3600, timezone.utc):%H}:00")
 
 
