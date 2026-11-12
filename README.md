@@ -19,7 +19,7 @@ api/        Flask API + hourly ingest (Python 3.11)
   wiki_trends/demo.py     synthetic data for local frontend work and previews (WIKI_TRENDS_DEMO=1)
   wiki_trends/gate.py     optional shared passphrase for the whole site (WIKI_TRENDS_PASSPHRASE)
   wiki_trends/deploy.py   self-update on pushes to main (GitHub webhook at /hooks/github, or a scheduled job)
-deploy/     Toolforge helpers: uwsgi.ini (reload on touch), autodeploy.sh, demo-refresh.sh
+deploy/     Toolforge helpers: uwsgi.ini (reload on touch), autodeploy.sh
 frontend/   static site (no build step); talks only to the API
   assets/vendor/codex/    Codex, the Wikimedia design system (CSS-only components + design tokens), vendored
 ```
@@ -46,8 +46,7 @@ python3 -m venv .venv && .venv/bin/pip install -r api/requirements.txt pytest
 cd api
 ../.venv/bin/python -m pytest -q
 # synthetic data, API and frontend on http://localhost:8790
-DATABASE_URL=sqlite:///demo.sqlite3 WIKI_TRENDS_PROJECTS=enwiki ../.venv/bin/python -m wiki_trends.demo
-DATABASE_URL=sqlite:///demo.sqlite3 WIKI_TRENDS_PROJECTS=enwiki WIKI_TRENDS_FRONTEND=$PWD/../frontend ../.venv/bin/flask --app wiki_trends.app run --port 8790
+WIKI_TRENDS_DEMO=1 WIKI_TRENDS_FRONTEND=$PWD/../frontend ../.venv/bin/flask --app wiki_trends.app run --port 8790
 # real data (needs a Wikimedia Enterprise account)
 WME_USERNAME=… WME_PASSWORD=… ../.venv/bin/python -m wiki_trends.ingest --projects enwiki --hours-back 6
 ```
@@ -77,23 +76,20 @@ webservice python3.11 start
 
 ### Preview with synthetic data, behind a passphrase
 
-For a preview, skip the WME and `DATABASE_URL` envvars and the `ingest` job above. Until the real data is connected, the
-tool can serve the demo data (English Wikipedia, last 72 hours, a banner on every
-page says it is synthetic) from SQLite in the tool's home, behind a simple shared passphrase:
+For a preview, skip the WME and `DATABASE_URL` envvars and the `ingest` job above. With `WIKI_TRENDS_DEMO=1` the web
+service makes up its own data (English Wikipedia, last 72 hours, a banner on every page says it is synthetic): each
+worker builds it on local disk on its first request and rolls it forward every hour, so there is no database, job or
+shared file to keep in step. `DATABASE_URL` and `WIKI_TRENDS_PROJECTS` are ignored in demo mode.
 
 ```bash
 toolforge envvars create WIKI_TRENDS_DEMO 1
-toolforge envvars create WIKI_TRENDS_PROJECTS enwiki
-toolforge envvars create DATABASE_URL sqlite:////data/project/wiki-trends/demo.sqlite3
 toolforge envvars create WIKI_TRENDS_PASSPHRASE '…'      # visitors enter it once (30-day cookie); delete the envvar to open the site
-webservice python3.11 shell -- ~/wiki-trends/deploy/demo-refresh.sh   # first load; the venv only works inside the python3.11 image, not on the bastion
-toolforge jobs run demo-refresh --image python3.11 --schedule '15 4 * * *' --command '~/wiki-trends/deploy/demo-refresh.sh'
 webservice python3.11 restart
 ```
 
-To switch to real data: `toolforge envvars delete WIKI_TRENDS_DEMO`,
-`toolforge jobs delete demo-refresh`, set `DATABASE_URL` to ToolsDB and `WIKI_TRENDS_PROJECTS` (or delete it for all
-seven), create the `ingest` job, restart. Bots can send the passphrase in an `X-Wiki-Trends-Passphrase` header.
+To switch to real data: `toolforge envvars delete WIKI_TRENDS_DEMO`, set `DATABASE_URL` to ToolsDB (and
+`WIKI_TRENDS_PROJECTS` if not all seven), create the `ingest` job, restart. Bots can send the passphrase in an
+`X-Wiki-Trends-Passphrase` header.
 
 ### Updating automatically when main changes
 

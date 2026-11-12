@@ -86,3 +86,25 @@ def test_demo_mode(api, monkeypatch):
     assert REAL_OUTLINKS("enwiki", "Page_with_no_demo_links") == []
     store.store_links("enwiki", "The_Odyssey", ["Homer"])
     assert REAL_OUTLINKS("enwiki", "The_Odyssey") == ["Homer"]
+
+
+def test_demo_builds_and_rolls_forward(tmp_path, monkeypatch):
+    from wiki_trends import app as appmod, demo
+    monkeypatch.setenv("WIKI_TRENDS_DEMO", "1")
+    monkeypatch.setattr(linkmod.requests, "Session", lambda: (_ for _ in ()).throw(AssertionError("live fetch")))
+    store.engine(f"sqlite:///{tmp_path}/demo.sqlite3")
+    monkeypatch.setattr(demo, "_built", None)
+    t0 = 1_794_000_000
+    monkeypatch.setattr(demo.time, "time", lambda: t0)
+    c = appmod.app.test_client()
+    assert c.get("/v1/trending/enwiki?k=50").get_json()["items"]
+    peak = time.strftime("%Y-%m-%dT%H", time.gmtime(t0 - 8 * 3600))  # the story breaks 8 hours before the last hour
+    r = c.get(f"/v1/trending/enwiki?k=50&hour={peak}").get_json()
+    assert "The_Odyssey" in [i["title"] for i in r["items"]]
+    assert c.get("/v1/pages/enwiki/The_Odyssey").status_code == 200
+    first = store.loaded_hours("enwiki", "batch")
+    assert len(first) == 72 and first[-1] == t0 // 3600 - 2
+    monkeypatch.setattr(demo.time, "time", lambda: t0 + 3 * 3600)  # three hours later: rolled forward, still 72 hours
+    c.get("/v1/projects")
+    later = store.loaded_hours("enwiki", "batch")
+    assert len(later) == 72 and later[-1] == first[-1] + 3

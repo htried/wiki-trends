@@ -9,7 +9,8 @@ DATABASE_URL                  SQLAlchemy URL; default sqlite:///wiki_trends.sqli
 WIKI_TRENDS_PROJECTS          comma-separated project identifiers; default the initial WME release
 WIKI_TRENDS_RETENTION_HOURS   hourly history kept per page (default 168 = 7 days)
 WIKI_TRENDS_CONTACT           contact URL or address for the User-Agent sent to Wikimedia APIs
-WIKI_TRENDS_DEMO              1: the data is synthetic (wiki_trends.demo); the site says so on every page
+WIKI_TRENDS_DEMO              1: serve synthetic data (wiki_trends.demo), rebuilt hourly in each process; ignores
+                              DATABASE_URL, and the site says so on every page
 WIKI_TRENDS_PASSPHRASE        optional shared passphrase for the whole site (wiki_trends/gate.py)
 WIKI_TRENDS_SECRET            optional key for signing the passphrase cookie
 WIKI_TRENDS_WEBHOOK_SECRET    GitHub webhook secret for self-update on pushes to main (wiki_trends/deploy.py)
@@ -19,12 +20,15 @@ WIKI_TRENDS_RELOAD_FILE       file uWSGI watches for reloads (deploy/uwsgi.ini)
 from __future__ import annotations
 
 import os
+import tempfile
 
 # the initial Wikimedia Enterprise pageviews release: seven Wikipedias, articles (namespace 0)
 DEFAULT_PROJECTS = ["enwiki", "dewiki", "eswiki", "frwiki", "itwiki", "nlwiki", "ptwiki"]
 
 
 def projects() -> list[str]:
+    if is_demo():
+        return ["enwiki"]  # the demo data is English Wikipedia only
     raw = os.environ.get("WIKI_TRENDS_PROJECTS", "")
     return [p.strip() for p in raw.split(",") if p.strip()] or list(DEFAULT_PROJECTS)
 
@@ -42,6 +46,8 @@ def wiki_host(project: str) -> str:
 
 
 def database_url() -> str:
+    if is_demo():  # synthetic data: a throwaway SQLite file per process on local disk, built by wiki_trends.demo
+        return f"sqlite:///{tempfile.gettempdir()}/wiki-trends-demo-{os.getpid()}.sqlite3"
     return os.environ.get("DATABASE_URL", "sqlite:///wiki_trends.sqlite3")
 
 

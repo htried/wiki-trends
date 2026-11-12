@@ -11,6 +11,7 @@ ingested    which (project, hour, kind) are loaded
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections.abc import Iterable
 
@@ -56,12 +57,18 @@ ingested = Table(
 )
 
 _engine: Engine | None = None
+_pid: int | None = None
+_url: str | None = None  # set explicitly (tests); otherwise from the environment
 
 
 def engine(url: str | None = None) -> Engine:
-    global _engine
-    if url is not None or _engine is None:
-        _engine = create_engine(url or database_url(), pool_pre_ping=True, pool_recycle=280)
+    global _engine, _pid, _url
+    if url is not None:
+        _url = url
+    # a new engine per process: connections must not be shared across uWSGI's forked workers
+    if url is not None or _engine is None or _pid != os.getpid():
+        _engine = create_engine(_url or database_url(), pool_pre_ping=True, pool_recycle=280)
+        _pid = os.getpid()
         md.create_all(_engine)
     return _engine
 

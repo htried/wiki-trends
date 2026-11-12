@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 
-from . import deploy, gate
+from . import demo, deploy, gate
 from . import links as linkmod
 from . import store
 from .config import is_demo, projects, retention_hours, wiki_host
@@ -33,6 +33,12 @@ app = Flask(__name__)
 app.json.sort_keys = False
 gate.install(app)
 deploy.install(app)
+
+
+@app.before_request
+def _demo_data():
+    if is_demo() and request.path.startswith("/v1/"):
+        demo.ensure_current()
 _client: WMEClient | None = None
 _fetch_lock = threading.Lock()
 

@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Synthetic data for working on the frontend without WME credentials: three days of hourly records for English
 Wikipedia, built around one story (a film adaptation of The Odyssey: "The Odyssey" moving with "Matt Damon"), plus
-ordinary pages, clickstream sources, geography, and cached article links. For local development and previews only;
-run the site with WIKI_TRENDS_DEMO=1 so it says the data is synthetic and never mixes in live data.
+ordinary pages, clickstream sources, geography, and cached article links. For local development and previews only.
 
-    DATABASE_URL=sqlite:///demo.sqlite3 WIKI_TRENDS_PROJECTS=enwiki python -m wiki_trends.demo [--reset]
+With WIKI_TRENDS_DEMO=1 the API needs nothing else: each process builds the data in its own SQLite file on local disk
+on the first request and rolls it forward every hour (the 72 hours end two hours ago, the story breaks 8 hours before
+that). The site says the data is synthetic and never mixes in live data. To write it into a database instead:
 
-The 72 hours end two hours ago, so rerun it (e.g. daily, with --reset) to keep the demo current.
+    DATABASE_URL=sqlite:///demo.sqlite3 python -m wiki_trends.demo [--reset]
 """
 
 from __future__ import annotations
@@ -14,7 +15,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import os
 import random
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -63,25 +66,18 @@ def record(title: str, hour: int, count: int, mean: float, std: float, trending:
                         "is_trending_project_proportion": trending and z > 3}}
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--reset", action="store_true", help="delete everything in the database first")
-    args = ap.parse_args()
-    rng = random.Random(3)
-    eng = store.engine()
-    if args.reset:
-        store.md.drop_all(eng)
-        store.md.create_all(eng)
-    now = int(time.time()) // 3600 - 2
+def generate(now: int) -> None:
+    """Write the 72 demo hours ending at hour `now` (hours since 1970) and drop older ones. Each page's noise is seeded
+    by page and hour, so an hour looks the same every time it is generated."""
     hours = list(range(now - 71, now + 1))
     story_hour = now - 8
-    base = {t: v[0] for t, v in STORY.items()} | {t: rng.choice([60, 150, 400, 900, 2500]) for t in BACKGROUND}
+    base = {t: v[0] for t, v in STORY.items()} | {t: random.Random(t).choice([60, 150, 400, 900, 2500]) for t in BACKGROUND}
     hist: dict[str, list[int]] = {t: [] for t in base}
     for h in hours:
         recs = []
         for t, b in base.items():
             daily = 1 + 0.35 * math.sin(2 * math.pi * ((h % 24) - 9) / 24)
-            v = b * daily * rng.uniform(0.85, 1.15)
+            v = b * daily * random.Random(f"{t}|{h}").uniform(0.85, 1.15)
             if t in STORY and h >= story_hour:
                 mult, peak = STORY[t][1], STORY[t][2]
                 dt = h - story_hour
@@ -96,8 +92,39 @@ def main() -> None:
                                                    "associated_pages": {"period": {"start": "2026-10-01T00:00:00Z", "end": "2026-10-31T23:59:59Z"}}})
         trend = sorted([f for f in flat if f["trending_abs"] or f["trending_rel"]], key=lambda f: -(f["zscore"] or 0))
         store.write_trending("enwiki", h, trend)
+    store.prune("enwiki", hours[0])
     for t, ls in LINKS.items():
         store.store_links("enwiki", t, ls)
+
+
+_lock = threading.Lock()
+_built: tuple[int, int] | None = None
+
+
+def ensure_current() -> None:
+    """Build the demo data in this process's database, or roll it forward when a new hour has started."""
+    global _built
+    want = (os.getpid(), int(time.time()) // 3600 - 2)
+    if _built == want:
+        return
+    with _lock:
+        if _built != want:
+            generate(want[1])
+            _built = want
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--reset", action="store_true", help="delete everything in the database first")
+    args = ap.parse_args()
+    eng = store.engine()
+    if args.reset:
+        store.md.drop_all(eng)
+        store.md.create_all(eng)
+    now = int(time.time()) // 3600 - 2
+    story_hour = now - 8
+    generate(now)
+    hours = range(now - 71, now + 1)
     print(f"demo data in {eng.url.render_as_string(hide_password=True)}: enwiki, {len(hours)} hours ending {datetime.fromtimestamp(now * 3600, timezone.utc):%Y-%m-%d %H}:00 UTC; "
           f"story breaks at {datetime.fromtimestamp(story_hour * 3600, timezone.utc):%H}:00")
 
