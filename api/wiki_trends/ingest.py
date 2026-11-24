@@ -35,8 +35,26 @@ def ingest_hour(client: WMEClient, project: str, hour: int, *, trending_only: bo
     if not trending_only and not store.is_loaded(project, hour, "batch"):
         try:
             info = client.batch_info(project, hour)
-            n = store.write_hourly(project, hour, (flatten(r, hour) for r in client.batch_records(project, hour)),
-                                   meta={k: info.get(k) for k in ("count", "size", "date_modified", "geo_data", "associated_pages")})
+            meta = {"count": info.get("record_count", info.get("count")), "size": info.get("size"),
+                    "date_modified": info.get("date_modified")}
+
+            seen: set[str] = set()
+
+            def recs():
+                # the periods the geography and the clickstream describe come with the records: note the first of each
+                for r in client.batch_records(project, hour):
+                    f = flatten(r, hour)
+                    if not f["title"] or f["title"] in seen:  # batches can repeat a title (e.g. several records named "-")
+                        meta["duplicates"] = meta.get("duplicates", 0) + 1
+                        continue
+                    seen.add(f["title"])
+                    if f["geo_period"] and "geo_data" not in meta:
+                        meta["geo_data"] = {"period": f["geo_period"]}
+                    if f["sources_period"] and "associated_pages" not in meta:
+                        meta["associated_pages"] = {"period": f["sources_period"]}
+                    yield f
+
+            n = store.write_hourly(project, hour, recs(), meta=meta)
             done["batch"] = n
         except NotAvailable:
             done["batch"] = "not available"

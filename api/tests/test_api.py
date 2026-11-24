@@ -56,6 +56,37 @@ def test_flatten_readme_record():
     assert key("the odyssey") == "The_odyssey"
 
 
+# the shape the live API returns (2026-11): the hour, the statistics, geography and source pages each in their own entry
+LIVE_RECORD = {
+    "name": "Example_page", "identifier": 42, "is_part_of": {"identifier": "enwiki"}, "namespace": {"identifier": 0},
+    "url": "https://en.wikipedia.org/wiki/Example_page", "main_entity": {"identifier": "Q42"},
+    "views": [
+        {"comment": "views during the hour", "period": {"start": "2026-11-24T17:00:00Z", "end": "2026-11-24T17:59:59Z"},
+         "count": 1000, "project_proportion": 0.0001},
+        {"comment": "aggregation of hourly views during past 96 hours",
+         "period": {"start": "2026-11-20T16:00:00Z", "end": "2026-11-24T16:59:59Z"},
+         "statistics": [{"variable": "count", "values": {"mean": 10.0, "stddev": 3.0, "ratio": 100.0, "zscore": 330.0}},
+                        {"variable": "project_proportion", "values": {"mean": 1e-6, "stddev": 4e-7, "ratio": 90.0, "zscore": 250.0}}]},
+        {"comment": "aggregation of hourly views over most recent daily partition",
+         "period": {"start": "2026-11-19T00:00:00Z", "end": "2026-11-19T23:59:59Z"}, "count": 200,
+         "geo_distributions": [{"country_code": "US", "proportion": 1.0}], "geo_distributions_total": 100},
+        {"comment": "aggregation of daily views over most recent monthly partition",
+         "period": {"start": "2026-09-01T00:00:00Z", "end": "2026-09-01T23:59:59Z"},
+         "source_pages": [{"name": "Other page", "proportion": 0.5}], "source_pages_total": 3000},
+    ],
+    "signals": {"is_new_page": False, "is_trending_absolute": True, "is_trending_project_proportion": True},
+}
+
+
+def test_flatten_live_record():
+    f = flatten(LIVE_RECORD, 498_761)  # 2026-11-24T17
+    assert f["count"] == 1000 and f["proportion"] == 0.0001
+    assert (f["mean"], f["stddev"], f["ratio"], f["zscore"]) == (10.0, 3.0, 100.0, 330.0)  # the count statistics
+    assert f["geo"] == [{"country": "US", "proportion": 1.0}] and f["geo_total"] == 100
+    assert f["sources"] == [{"title": "Other_page", "proportion": 0.5}] and f["sources_total"] == 3000
+    assert f["trending_abs"] and f["trending_rel"]
+
+
 def test_archive_ndjson_and_array():
     for payload in ("\n".join(json.dumps(r) for r in [README_RECORD, README_RECORD]), json.dumps([README_RECORD, README_RECORD])):
         buf = io.BytesIO()
