@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from urllib.parse import unquote
 
@@ -38,6 +39,11 @@ def _count_stats(views: list[dict]) -> dict:
     return {}
 
 
+def _num(x) -> float | None:
+    """A finite number or None (MariaDB rejects NaN and infinity, which JSON parsing lets through)."""
+    return x if isinstance(x, (int, float)) and math.isfinite(x) else None
+
+
 def _first_with(views: list[dict], field: str) -> dict:
     return next((v for v in views if v.get(field)), {})
 
@@ -61,11 +67,11 @@ def flatten(rec: dict, hour: int | None = None) -> dict:
         "page_id": rec.get("identifier"),
         "qid": (rec.get("main_entity") or {}).get("identifier"),
         "count": int(v.get("count") or 0),
-        "proportion": v.get("project_proportion"),
-        "mean": st.get("mean"),
-        "stddev": st.get("stddev"),
-        "ratio": st.get("ratio"),
-        "zscore": st.get("zscore"),
+        "proportion": _num(v.get("project_proportion")),
+        "mean": _num(st.get("mean")),
+        "stddev": _num(st.get("stddev")),
+        "ratio": _num(st.get("ratio")),
+        "zscore": _num(st.get("zscore")),
         "trending_abs": bool(sig.get("is_trending_absolute")),
         "trending_rel": bool(sig.get("is_trending_project_proportion")),
         "is_new": bool(sig.get("is_new_page")),

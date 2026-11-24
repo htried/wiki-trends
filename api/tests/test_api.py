@@ -85,6 +85,10 @@ def test_flatten_live_record():
     assert f["geo"] == [{"country": "US", "proportion": 1.0}] and f["geo_total"] == 100
     assert f["sources"] == [{"title": "Other_page", "proportion": 0.5}] and f["sources_total"] == 3000
     assert f["trending_abs"] and f["trending_rel"]
+    odd = copy.deepcopy(LIVE_RECORD)
+    odd["views"][1]["statistics"][0]["values"].update(ratio=float("inf"), zscore=float("nan"))
+    f = flatten(odd, 498_761)
+    assert f["ratio"] is None and f["zscore"] is None and f["mean"] == 10.0
 
 
 def test_archive_ndjson_and_array():

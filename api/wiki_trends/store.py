@@ -17,7 +17,7 @@ from collections.abc import Iterable
 
 from sqlalchemy import (Boolean, Column, Float, Integer, MetaData, String, Table, Text, and_, create_engine, delete, func,
                         insert, select)
-from sqlalchemy.dialects.mysql import VARCHAR
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, VARCHAR
 from sqlalchemy.engine import Engine
 
 from .config import database_url
@@ -25,6 +25,8 @@ from .config import database_url
 md = MetaData()
 # titles are case-sensitive: MariaDB's default collation is not, so use a binary one there
 TITLE = String(255).with_variant(VARCHAR(255, collation="utf8mb4_bin"), "mysql", "mariadb")
+# JSON lists: MariaDB's TEXT stops at 64 KB, and e.g. Main_Page's clickstream sources are ~130 KB
+LONG = Text().with_variant(MEDIUMTEXT(), "mysql", "mariadb")
 hourly = Table(
     "hourly", md,
     Column("project", String(16), primary_key=True), Column("hour", Integer, primary_key=True),
@@ -42,12 +44,12 @@ trending = Table(
 page_meta = Table(
     "page_meta", md,
     Column("project", String(16), primary_key=True), Column("title", TITLE, primary_key=True), Column("hour", Integer),
-    Column("page_id", Integer), Column("qid", String(32)), Column("geo", Text), Column("geo_total", Integer),
-    Column("sources", Text), Column("sources_total", Integer),
+    Column("page_id", Integer), Column("qid", String(32)), Column("geo", LONG), Column("geo_total", Integer),
+    Column("sources", LONG), Column("sources_total", Integer),
 )
 links = Table(
     "links", md,
-    Column("project", String(16), primary_key=True), Column("title", TITLE, primary_key=True), Column("links", Text),
+    Column("project", String(16), primary_key=True), Column("title", TITLE, primary_key=True), Column("links", LONG),
     Column("fetched", Integer),
 )
 ingested = Table(
@@ -70,7 +72,21 @@ def engine(url: str | None = None) -> Engine:
         _engine = create_engine(_url or database_url(), pool_pre_ping=True, pool_recycle=280)
         _pid = os.getpid()
         md.create_all(_engine)
+        _widen(_engine)
     return _engine
+
+
+def _widen(eng: Engine) -> None:
+    """Tables created before the JSON columns were MEDIUMTEXT on MariaDB: widen them in place."""
+    if eng.dialect.name not in ("mysql", "mariadb"):
+        return
+    with eng.begin() as c:
+        for table, col in (("page_meta", "geo"), ("page_meta", "sources"), ("links", "links")):
+            kind = c.exec_driver_sql(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = %s AND COLUMN_NAME = %s", (table, col)).scalar()
+            if kind == "text":
+                c.exec_driver_sql(f"ALTER TABLE {table} MODIFY {col} MEDIUMTEXT")
 
 
 def _replace(conn, table: Table, rows: list[dict], keys: list[str]) -> None:
