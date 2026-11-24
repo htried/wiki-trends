@@ -127,12 +127,11 @@ def records_from_archive(fileobj) -> Iterator[dict]:
             f = tar.extractfile(member)
             if f is None:
                 continue
-            data = f.read()
-            text = data.decode("utf-8")
-            if text.lstrip().startswith("["):
-                yield from json.loads(text)
+            f = io.BufferedReader(f)
+            if f.peek(64).lstrip().startswith(b"["):  # one JSON array: has to be read whole
+                yield from json.load(f)
                 continue
-            for line in text.splitlines():
+            for line in f:  # NDJSON: one record at a time, so a batch never sits in memory whole
                 if line.strip():
                     yield json.loads(line)
 

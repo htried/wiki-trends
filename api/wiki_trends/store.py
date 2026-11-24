@@ -104,7 +104,9 @@ def write_hourly(project: str, hour: int, recs: Iterable[dict], meta: dict | Non
             buf.append({"project": project, "hour": hour, **{k: r[k] for k in (
                 "title", "count", "proportion", "mean", "stddev", "ratio", "zscore", "trending_abs", "trending_rel", "is_new")}})
             if r["geo"] or r["sources"]:
-                metas.append(r)
+                # kept as JSON text until the hour is written: Python lists for ~50,000 pages take hundreds of MB
+                metas.append({**{k: r.get(k) for k in ("title", "page_id", "qid", "geo_total", "sources_total")},
+                              "geo": json.dumps(r["geo"]), "sources": json.dumps(r["sources"])})
             if len(buf) >= chunk:
                 c.execute(insert(hourly), buf)
                 n += len(buf)
@@ -117,9 +119,13 @@ def write_hourly(project: str, hour: int, recs: Iterable[dict], meta: dict | Non
     return n
 
 
+def _json(v) -> str:
+    return v if isinstance(v, str) else json.dumps(v)
+
+
 def write_meta(project: str, hour: int, recs: list[dict]) -> None:
     rows = [{"project": project, "title": r["title"], "hour": hour, "page_id": r.get("page_id"), "qid": r.get("qid"),
-             "geo": json.dumps(r["geo"]), "geo_total": r.get("geo_total"), "sources": json.dumps(r["sources"]),
+             "geo": _json(r["geo"]), "geo_total": r.get("geo_total"), "sources": _json(r["sources"]),
              "sources_total": r.get("sources_total")} for r in recs if r["geo"] or r["sources"]]
     if not rows:
         return
