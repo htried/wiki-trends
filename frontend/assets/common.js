@@ -62,16 +62,26 @@ function drawLine(c, xs, ys, color, lw) {
     }
   }
 }
-// sparkline: log scale, the last point marked; null = below the batch's storage threshold
+// Wikimedia Enterprise's hourly batches leave out pages under 25 views that hour, so a missing (null) hour means
+// "fewer than 25": charts draw those hours faintly at 25 instead of leaving a gap
+const FLOOR = 25;
+// a line in two passes: faint through hours under the floor, solid where both ends are known
+function drawFloored(c, xs, values, Y, color, lw) {
+  if (values.some(v => v == null) && values.some(v => v != null)) {
+    c.save(); c.globalAlpha = 0.35; drawLine(c, xs, values.map(v => Y(v == null ? FLOOR : v)), color, Math.max(1, lw * 0.7)); c.restore();
+  }
+  drawLine(c, xs, values.map(v => v == null ? null : Y(v)), color, lw);
+}
+// sparkline: log scale, the last point marked
 function sparkline(el, values, color, tries = 0) {
   if (!el.clientWidth) { if (tries < 30) requestAnimationFrame(() => sparkline(el, values, color, tries + 1)); return }
   const [c, w] = canvasCtx(el, 32), n = values.length, pad = 2;
-  const f = v => Math.log10((v || 0) + 1), vals = values.map(v => v == null ? null : f(v));
-  const lo = Math.min(...vals.filter(v => v != null), 0), hi = Math.max(...vals.filter(v => v != null), 1);
+  const f = v => Math.log10((v || 0) + 1), vals = values.map(v => f(v == null ? FLOOR : v));
+  const lo = Math.min(...vals), hi = Math.max(...vals, lo + 1);
   const xs = values.map((_, i) => pad + (w - 2 * pad) * i / Math.max(1, n - 1));
-  const ys = vals.map(v => v == null ? null : 32 - pad - (32 - 2 * pad) * (v - lo) / ((hi - lo) || 1));
-  drawLine(c, xs, ys, color || css("--color-base"), 1.4);
-  if (ys[n - 1] != null) { c.fillStyle = css("--color-destructive"); c.fillRect(xs[n - 1] - 2, ys[n - 1] - 2, 4, 4) }
+  const Y = v => 32 - pad - (32 - 2 * pad) * (f(v) - lo) / ((hi - lo) || 1);
+  drawFloored(c, xs, values, Y, color || css("--color-base"), 1.4);
+  if (values[n - 1] != null) { c.fillStyle = css("--color-destructive"); c.fillRect(xs[n - 1] - 2, Y(values[n - 1]) - 2, 4, 4) }
 }
 // time-series chart with a shared y axis (log or linear) and an hour tooltip
 const AX = {left: 56, right: 10, top: 8, bottom: 22};
@@ -81,7 +91,7 @@ function axisChart(el, tip, opts, tries = 0) {
   const n = lines[0].values.length, pw = w - AX.left - AX.right, ph = height - AX.top - AX.bottom;
   const f = v => log ? Math.log10(Math.max(v, 0) + 1) : v;
   let hi = 1, lo = log ? Infinity : 0;
-  for (const l of lines) for (const v of l.values) if (v != null) { hi = Math.max(hi, f(v)); if (log) lo = Math.min(lo, f(v)) }
+  for (const l of lines) for (const v0 of l.values) { const v = v0 == null ? FLOOR : v0; hi = Math.max(hi, f(v)); if (log) lo = Math.min(lo, f(v)) }
   lo = log ? Math.max(0, Math.floor(lo === Infinity ? 0 : lo)) : 0;
   const X = i => AX.left + pw * i / Math.max(1, n - 1), Y = v => AX.top + ph - ph * (f(v) - lo) / ((hi - lo) || 1);
   const ticks = [];
@@ -98,11 +108,11 @@ function axisChart(el, tip, opts, tries = 0) {
     if (d.getUTCHours() === 0) { c.fillStyle = css("--border-color-subtle"); c.fillRect(X(i), AX.top, 1, ph); c.fillStyle = css("--color-subtle"); c.fillText(`${MON[d.getUTCMonth()]} ${d.getUTCDate()}`, X(i), height - 6) }
   }
   const xs = [...Array(n).keys()].map(X);
-  for (const l of lines) drawLine(c, xs, l.values.map(v => v == null ? null : Y(v)), l.color, l.width || 1.8);
+  for (const l of lines) drawFloored(c, xs, l.values, Y, l.color, l.width || 1.8);
   el.onmousemove = e => {
     const r = el.getBoundingClientRect(), i = Math.round((e.clientX - r.left - AX.left) / (pw / Math.max(1, n - 1)));
     if (i < 0 || i >= n) { tip.style.display = "none"; return }
-    tip.innerHTML = `<b>${hourLabel(startMs + i * 3600e3)}</b>` + lines.map(l => `<div style="color:${l.color}">${esc(l.name)}: <b>${fmt(l.values[i])}</b></div>`).join("");
+    tip.innerHTML = `<b>${hourLabel(startMs + i * 3600e3)}</b>` + lines.map(l => `<div style="color:${l.color}">${esc(l.name)}: <b>${l.values[i] == null ? `under ${FLOOR}` : fmt(l.values[i])}</b></div>`).join("");
     tip.style.display = "block"; tip.style.left = Math.min(e.clientX - r.left + 12, r.width - tip.offsetWidth) + "px"; tip.style.top = "6px";
   };
   el.onmouseleave = () => { tip.style.display = "none" };
