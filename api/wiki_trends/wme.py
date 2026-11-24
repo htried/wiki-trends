@@ -87,6 +87,9 @@ class WMEClient:
                 continue
             if r.status_code == 404:
                 raise NotAvailable(_message(r))
+            if r.status_code == 403:
+                raise WMEError(f"WME {path}: HTTP 403: this account is signed in but not allowed to use this endpoint "
+                               "(pageviews needs its own access on the Wikimedia Enterprise account)")
             if r.status_code >= 400:
                 raise WMEError(f"WME {path}: HTTP {r.status_code}: {_message(r)}")
             return r
